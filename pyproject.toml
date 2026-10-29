@@ -5,6 +5,7 @@ description = "Foundation for a marketplace data platform"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "altair>=5,<7",
     "dagster>=1.10,<2",
     "dagster-webserver>=1.10,<2",
     "dbt-core>=1.9,<2",

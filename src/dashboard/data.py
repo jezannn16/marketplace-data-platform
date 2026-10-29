@@ -80,3 +80,36 @@ def query_freshness(conn, max_age: timedelta, now: datetime | None = None):
         )
         for name in RESOURCES
     ]
+
+
+def query_visuals(conn, schema: str, start, end, product_ids: list[int] | None):
+    """Aggregate actual records for the selected period and product filter."""
+    params = (start, end, product_ids, product_ids)
+    sales = conn.execute(
+        sql.SQL("""SELECT order_date_utc, count(*), sum(order_total_rub)
+            FROM {} WHERE order_date_utc BETWEEN %s AND %s
+            AND (%s::bigint[] IS NULL OR product_id = ANY(%s::bigint[]))
+            GROUP BY order_date_utc ORDER BY order_date_utc""").format(
+            relation(schema, "stg_orders")
+        ),
+        params,
+    ).fetchall()
+    ads = conn.execute(
+        sql.SQL("""SELECT ad_date, sum(advertising_spend_rub)
+            FROM {} WHERE ad_date BETWEEN %s AND %s
+            AND (%s::bigint[] IS NULL OR product_id = ANY(%s::bigint[]))
+            GROUP BY ad_date ORDER BY ad_date""").format(relation(schema, "mart_ad_performance")),
+        params,
+    ).fetchall()
+    products = conn.execute(
+        sql.SQL("""SELECT p.sku, p.product_name, count(*), sum(o.order_total_rub)
+            FROM {} o JOIN {} p ON p.product_id = o.product_id
+            WHERE o.order_date_utc BETWEEN %s AND %s
+            AND (%s::bigint[] IS NULL OR o.product_id = ANY(%s::bigint[]))
+            GROUP BY p.product_id, p.sku, p.product_name
+            ORDER BY sum(o.order_total_rub) DESC, p.product_id LIMIT 10""").format(
+            relation(schema, "stg_orders"), relation(schema, "stg_products")
+        ),
+        params,
+    ).fetchall()
+    return sales, ads, products

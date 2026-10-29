@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
-from dashboard.data import date_bounds, get_products, query_freshness, query_metrics
+from dashboard.data import date_bounds, get_products, query_freshness, query_metrics, query_visuals
 from ingestion.pipeline import run
 
 
@@ -49,6 +49,19 @@ def test_dashboard_filters_and_freshness_on_postgres(test_database_url):
             )
             assert sales[0] > 0 and sales[1] > 0 and ads[0] > 0
             assert len(stocks) == 1 and stocks[0][0] == 1
+            daily, ad_daily, ranked = query_visuals(
+                conn, "analytics", date(2025, 1, 1), date(2025, 1, 30), [1]
+            )
+            assert sum(row[1] for row in daily) == sales[0]
+            assert sum(row[2] for row in daily) == sales[1]
+            assert sum(row[1] for row in ad_daily) == ads[0]
+            assert len(ranked) == 1 and ranked[0][2] == sales[0]
+            assert all(
+                row[0] == date(2025, 1, 1)
+                for row in query_visuals(
+                    conn, "analytics", date(2025, 1, 1), date(2025, 1, 1), [1]
+                )[0]
+            )
             expected = conn.execute(
                 "SELECT count(*) FROM analytics.stg_orders "
                 "WHERE product_id = 1 AND order_date_utc = %s",

@@ -5,6 +5,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 COPY dbt ./dbt
+COPY .streamlit ./.streamlit
 RUN uv sync --locked --no-dev --no-cache \
     && useradd --create-home --user-group --uid 10001 app \
     && mkdir -p /app/dagster_home \
