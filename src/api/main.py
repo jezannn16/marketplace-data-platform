@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Annotated, Literal, TypeVar
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from pydantic import AwareDatetime
 
 from api.data import ADVERTISING, ORDERS, PRODUCTS, STOCKS
@@ -63,6 +64,12 @@ async def respond(
     if scenario == "empty":
         return paginate([], page, page_size, updated_at)
     return paginate(records, page, page_size, updated_at)
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    """Open the interactive API documentation from the root URL."""
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health")
