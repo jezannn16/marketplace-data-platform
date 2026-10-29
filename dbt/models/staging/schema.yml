@@ -1,0 +1,108 @@
+version: 2
+models:
+  - name: stg_products
+    description: "One current synthetic product per product_id, with prices in RUB."
+    columns:
+      - name: product_id
+        description: Source product identifier.
+        data_tests: [unique, not_null]
+      - name: sku
+        description: Synthetic stock keeping unit.
+        data_tests: [unique, not_null]
+      - name: currency
+        description: Currency supplied by the API.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['RUB']
+      - name: updated_at
+        description: Source modification timestamp.
+        data_tests: [not_null]
+  - name: stg_orders
+    description: "One latest version of each synthetic order. Dates use UTC."
+    columns:
+      - name: order_id
+        description: Source order identifier.
+        data_tests: [unique, not_null]
+      - name: product_id
+        description: Ordered product.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: order_date_utc
+        description: Date of order creation in UTC.
+        data_tests: [not_null]
+      - name: status
+        description: Latest source status; not a status history.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['created', 'shipped', 'delivered', 'cancelled']
+      - name: currency
+        description: Currency supplied by the API.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['RUB']
+      - name: order_total_rub
+        description: Total price in RUB before any cancellation or return adjustment.
+        data_tests: [not_null]
+  - name: stg_stocks
+    description: One source stock observation per stock_id.
+    columns:
+      - name: stock_id
+        description: Source snapshot identifier.
+        data_tests: [unique, not_null]
+      - name: product_id
+        description: Product whose inventory was observed.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: warehouse
+        description: Warehouse identifier.
+        data_tests: [not_null]
+      - name: observed_at
+        description: Observation timestamp.
+        data_tests: [not_null]
+      - name: quantity
+        description: Units in the snapshot.
+        data_tests: [not_null]
+  - name: stg_advertising
+    description: One source daily product-campaign advertising record.
+    columns:
+      - name: advertising_id
+        description: Source advertising record identifier.
+        data_tests: [unique, not_null]
+      - name: product_id
+        description: Advertised product.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: campaign_id
+        description: Synthetic campaign identifier.
+        data_tests: [not_null]
+      - name: ad_date
+        description: Source reporting date, treated as UTC by simulator convention.
+        data_tests: [not_null]
+      - name: spend_rub
+        description: Source advertising spend in RUB.
+        data_tests: [not_null]
+      - name: currency
+        description: Currency supplied by the API.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['RUB']

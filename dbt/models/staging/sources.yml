@@ -1,0 +1,10 @@
+version: 2
+sources:
+  - name: marketplace_raw
+    schema: raw
+    description: Latest raw records loaded by the ingestion pipeline.
+    tables:
+      - name: orders
+      - name: products
+      - name: stocks
+      - name: advertising

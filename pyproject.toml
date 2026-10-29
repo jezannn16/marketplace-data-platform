@@ -1,0 +1,40 @@
+[project]
+name = "marketplace-data-platform"
+version = "0.1.0"
+description = "Foundation for a marketplace data platform"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "httpx>=0.28,<1",
+    "psycopg[binary]>=3.2,<4",
+    "uvicorn[standard]>=0.34,<1.0",
+]
+
+[dependency-groups]
+dev = [
+    "dbt-core>=1.9,<2",
+    "dbt-postgres>=1.9,<2",
+    "pytest>=8.3,<10.0",
+    "ruff>=0.11,<1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/api", "src/common", "src/ingestion"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[project.scripts]
+marketplace-ingest = "ingestion.cli:main"

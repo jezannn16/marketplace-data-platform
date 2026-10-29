@@ -1,0 +1,99 @@
+version: 2
+models:
+  - name: mart_daily_sales
+    description: >-
+      One row per UTC order creation day. Gross revenue is gross order value, including
+      cancelled orders; it is not recognized revenue. Net revenue is unavailable without
+      return events and a refund policy and is NULL. AOV is gross value / all order IDs.
+    columns:
+      - name: sales_date_utc
+        description: UTC date of order creation.
+        data_tests: [unique, not_null]
+      - name: orders_count
+        description: Count of all order IDs, including cancellations.
+        data_tests: [not_null]
+      - name: cancelled_orders_count
+        description: Count whose latest status is cancelled.
+        data_tests: [not_null]
+      - name: gross_revenue_rub
+        description: Sum of all order totals in RUB; a gross order-value proxy.
+        data_tests: [not_null]
+      - name: net_revenue_rub
+        description: NULL because refunds and return amounts are absent.
+      - name: average_order_value_rub
+        description: Gross order value divided by all orders.
+  - name: mart_product_performance
+    description: One row per product, aggregated over all available source history.
+    columns:
+      - name: product_id
+        description: Product identifier.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: gross_revenue_rub
+        description: Gross order-value proxy including cancellations.
+      - name: net_revenue_rub
+        description: NULL; return and refund data are unavailable.
+      - name: orders_count
+        description: Count of all order IDs for the product.
+      - name: average_order_value_rub
+        description: Gross order-value proxy per order; NULL when no orders.
+      - name: advertising_spend_rub
+        description: Recorded product-level advertising spend; zero if no rows observed.
+      - name: roas
+        description: NULL because campaign-attributed revenue is not supplied.
+  - name: mart_ad_performance
+    description: One row per source reporting date, product and campaign; no order attribution.
+    columns:
+      - name: ad_date
+        description: Advertising reporting day, treated as UTC by simulator convention.
+        data_tests: [not_null]
+      - name: product_id
+        description: Advertised product.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: campaign_id
+        description: Campaign identifier.
+        data_tests: [not_null]
+      - name: advertising_spend_rub
+        description: Sum of source spend in RUB.
+        data_tests: [not_null]
+      - name: attributed_revenue_rub
+        description: NULL because order-to-campaign attribution is unavailable.
+      - name: roas
+        description: NULL because attributed revenue is unavailable.
+  - name: mart_inventory_risk
+    description: >-
+      One row per product. Sums latest known snapshot per warehouse and estimates days of
+      cover from non-cancelled ordered units in the 30 UTC days ending on the oldest selected
+      warehouse snapshot date. The estimate assumes complete data and constant demand.
+    columns:
+      - name: product_id
+        description: Product identifier.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: coverage_anchor_date_utc
+        description: Oldest date among latest warehouse snapshots, used as demand window end.
+      - name: latest_snapshot_date_utc
+        description: Newest date among latest warehouse snapshots; differences indicate stale snapshots.
+      - name: stock_quantity
+        description: Sum of latest observed quantity per warehouse; NULL if no snapshot.
+      - name: units_last_30_days
+        description: Units in non-cancelled orders in the trailing 30-day window.
+      - name: average_daily_units
+        description: Trailing 30-day units divided by 30, including days with no orders.
+      - name: stock_coverage_days
+        description: Stock divided by average daily units; NULL for zero demand or missing stock.
