@@ -30,8 +30,9 @@ select
     l.stock_quantity,
     d.units_last_30_days,
     d.units_last_30_days::numeric / 30 as average_daily_units,
-    l.stock_quantity::numeric / nullif(d.units_last_30_days::numeric / 30, 0)
-        as stock_coverage_days
+    case when l.coverage_anchor_date_utc = l.latest_snapshot_date_utc
+        then l.stock_quantity::numeric / nullif(d.units_last_30_days::numeric / 30, 0)
+    end as stock_coverage_days
 from {{ ref('stg_products') }} p
 left join latest l on p.product_id = l.product_id
 left join demand d on p.product_id = d.product_id

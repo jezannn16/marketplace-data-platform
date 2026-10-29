@@ -5,7 +5,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 COPY dbt ./dbt
-RUN uv sync --locked --no-dev --no-cache
+RUN uv sync --locked --no-dev --no-cache \
+    && useradd --create-home --user-group --uid 10001 app \
+    && mkdir -p /app/dagster_home \
+    && chown -R app:app /app
+USER app
 ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 8000 3000 8501

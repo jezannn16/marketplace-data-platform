@@ -1,10 +1,8 @@
 """Requires a dedicated PostgreSQL database; drops raw and analytics schemas."""
 
-import os
 from datetime import date, timedelta
 
 import psycopg
-import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -12,11 +10,8 @@ from dashboard.data import date_bounds, get_products, query_freshness, query_met
 from ingestion.pipeline import run
 
 
-def test_dashboard_filters_and_freshness_on_postgres():
-    url = os.getenv("TEST_DATABASE_URL")
-    if not url:
-        pytest.skip("Set TEST_DATABASE_URL to a dedicated test database")
-    with psycopg.connect(url) as conn:
+def test_dashboard_filters_and_freshness_on_postgres(test_database_url):
+    with psycopg.connect(test_database_url) as conn:
         conn.execute("DROP SCHEMA IF EXISTS analytics CASCADE")
         conn.execute("DROP SCHEMA IF EXISTS raw CASCADE")
         conn.commit()

@@ -56,3 +56,45 @@ jobs:
           export TELEGRAM_ENABLED=false
           uv run dagster job execute -m operations.definitions -j marketplace_job
           uv run python -c 'from streamlit.testing.v1 import AppTest; a = AppTest.from_file("src/dashboard/app.py", default_timeout=60).run(); assert not a.exception and not a.error; assert len(a.metric) == 6'
+
+  compose-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      POSTGRES_DB: marketplace_test
+      POSTGRES_USER: marketplace_test
+      POSTGRES_PASSWORD: ci-only-password
+      TELEGRAM_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and start Compose
+        run: |
+          docker compose config --quiet
+          docker compose up --build -d --wait
+      - name: Run ingestion and dbt through Dagster
+        run: docker compose run --rm --no-deps -e TELEGRAM_ENABLED=false dagster dagster job execute -m operations.definitions -j marketplace_job
+      - name: Check HTTP services
+        run: |
+          for endpoint in http://127.0.0.1:8000/health http://127.0.0.1:3000/server_info http://127.0.0.1:8501/_stcore/health; do
+            ready=false
+            for attempt in {1..60}; do
+              if curl -fsS "$endpoint" > /dev/null; then ready=true; break; fi
+              sleep 2
+            done
+            if [ "$ready" != true ]; then exit 1; fi
+          done
+      - name: Backup and restore verification
+        run: |
+          docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/marketplace-backup.dump'
+          docker compose cp postgres:/tmp/marketplace-backup.dump ./marketplace-backup.dump
+          docker compose cp ./marketplace-backup.dump postgres:/tmp/marketplace-restore.dump
+          docker compose exec -T postgres sh -c 'createdb -U "$POSTGRES_USER" marketplace_restore'
+          docker compose exec -T postgres sh -c 'pg_restore --exit-on-error --no-owner -U "$POSTGRES_USER" -d marketplace_restore /tmp/marketplace-restore.dump'
+          count=$(docker compose exec -T postgres sh -c 'psql -At -U "$POSTGRES_USER" -d marketplace_restore -c "select count(*) from raw.orders"')
+          test "$count" = "1000"
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Clean up
+        if: always()
+        run: docker compose down -v

@@ -15,4 +15,7 @@ from expected e
 join {{ ref('mart_inventory_risk') }} i using (product_id)
 where e.units_last_30_days != e.expected_units
     or i.average_daily_units != e.expected_units::numeric / 30
-    or (e.expected_units > 0 and abs(i.stock_coverage_days * i.average_daily_units - e.stock_quantity) > 0.01)
+    or (i.coverage_anchor_date_utc = i.latest_snapshot_date_utc and e.expected_units > 0
+        and (i.stock_coverage_days is null
+             or abs(i.stock_coverage_days * i.average_daily_units - e.stock_quantity) > 0.01))
+    or (i.coverage_anchor_date_utc != i.latest_snapshot_date_utc and i.stock_coverage_days is not null)

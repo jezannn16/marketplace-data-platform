@@ -96,4 +96,22 @@ models:
       - name: average_daily_units
         description: Trailing 30-day units divided by 30, including days with no orders.
       - name: stock_coverage_days
-        description: Stock divided by average daily units; NULL for zero demand or missing stock.
+        description: Stock divided by average daily units; NULL for zero demand, missing stock or differing warehouse snapshot dates.
+unit_tests:
+  - name: inventory_coverage_is_null_for_mismatched_warehouse_dates
+    description: Coverage must not combine stock snapshots taken on different days.
+    model: mart_inventory_risk
+    given:
+      - input: ref('stg_products')
+        rows:
+          - {product_id: 1, sku: SYN-1}
+      - input: ref('stg_stocks')
+        rows:
+          - {stock_id: 1, product_id: 1, warehouse: W1, quantity: 10, observed_at: '2025-01-30 00:00:00+00', observed_date_utc: '2025-01-30'}
+          - {stock_id: 2, product_id: 1, warehouse: W2, quantity: 5, observed_at: '2025-01-29 00:00:00+00', observed_date_utc: '2025-01-29'}
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1, product_id: 1, quantity: 2, status: delivered, order_date_utc: '2025-01-29'}
+    expect:
+      rows:
+        - {product_id: 1, stock_quantity: 15, units_last_30_days: 2, stock_coverage_days: null}

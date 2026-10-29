@@ -1,7 +1,5 @@
 """Uses a dedicated test database; the raw schema is dropped between tests."""
 
-import os
-
 import httpx
 import psycopg
 import pytest
@@ -12,11 +10,8 @@ from ingestion.pipeline import IngestionError, initialize, run
 
 
 @pytest.fixture
-def db():
-    url = os.environ.get("TEST_DATABASE_URL")
-    if not url:
-        pytest.skip("Set TEST_DATABASE_URL to a dedicated PostgreSQL test database")
-    with psycopg.connect(url) as conn:
+def db(test_database_url):
+    with psycopg.connect(test_database_url) as conn:
         conn.execute("DROP SCHEMA IF EXISTS raw CASCADE")
         conn.commit()
         try:

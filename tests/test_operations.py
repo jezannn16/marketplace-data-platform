@@ -70,3 +70,11 @@ def test_dagster_assets_dependency_and_job_resolution():
     from dagster import AssetKey
 
     assert AssetKey("marketplace_raw") in graph.get(AssetKey("marketplace_dbt")).parent_keys
+
+
+def test_guard_against_destructive_test_database_configuration():
+    from conftest import validate_test_database_url
+
+    validate_test_database_url("postgresql://localhost/marketplace_test")
+    with pytest.raises(ValueError, match="dedicated database"):
+        validate_test_database_url("postgresql://localhost/marketplace")
