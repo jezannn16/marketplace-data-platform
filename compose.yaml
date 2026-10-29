@@ -20,6 +20,65 @@ services:
     build: .
     ports:
       - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  dagster:
+    build: .
+    command: ["/app/.venv/bin/dagster", "dev", "--host", "0.0.0.0", "--port", "3000", "--module-name", "operations.definitions"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      DBT_HOST: postgres
+      DBT_PORT: "5432"
+      DBT_SCHEMA: ${DBT_SCHEMA:-analytics}
+      API_BASE_URL: http://api:8000
+      SELLER_API_SCENARIO: ${SELLER_API_SCENARIO:-normal}
+      SELLER_API_TIMEOUT_SECONDS: ${SELLER_API_TIMEOUT_SECONDS:-5}
+      DAGSTER_HOME: /app/dagster_home
+      TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      FRESHNESS_MAX_HOURS: ${FRESHNESS_MAX_HOURS:-24}
+    ports:
+      - "127.0.0.1:${DAGSTER_PORT:-3000}:3000"
+    volumes:
+      - dagster_data:/app/dagster_home
+      - ./config/dagster.yaml:/app/dagster_home/dagster.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  dashboard:
+    build: .
+    command: ["/app/.venv/bin/streamlit", "run", "src/dashboard/app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      DBT_SCHEMA: ${DBT_SCHEMA:-analytics}
+      DAGSTER_HOME: /app/dagster_home
+      FRESHNESS_MAX_HOURS: ${FRESHNESS_MAX_HOURS:-24}
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-8501}:8501"
+    volumes:
+      - dagster_data:/app/dagster_home
+      - ./config/dagster.yaml:/app/dagster_home/dagster.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+  dagster_data:

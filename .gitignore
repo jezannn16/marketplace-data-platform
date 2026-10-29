@@ -20,3 +20,6 @@ dbt/target/
 dbt/logs/
 dbt/dbt_packages/
 dbt/.user.yml
+# Database backups may contain data and must remain local.
+*.dump
+*.backup

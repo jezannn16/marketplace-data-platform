@@ -50,3 +50,9 @@ jobs:
           curl --silent --fail http://127.0.0.1:8000/health > /dev/null
           uv run marketplace-ingest
           uv run dbt build --project-dir dbt --profiles-dir dbt
+          mkdir -p /tmp/marketplace-dagster-ci
+          cp config/dagster.yaml /tmp/marketplace-dagster-ci/dagster.yaml
+          export DAGSTER_HOME=/tmp/marketplace-dagster-ci
+          export TELEGRAM_ENABLED=false
+          uv run dagster job execute -m operations.definitions -j marketplace_job
+          uv run python -c 'from streamlit.testing.v1 import AppTest; a = AppTest.from_file("src/dashboard/app.py", default_timeout=60).run(); assert not a.exception and not a.error; assert len(a.metric) == 6'

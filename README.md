@@ -165,3 +165,50 @@ uv run dbt docs serve --project-dir dbt --profiles-dir dbt
 - `stock_coverage_days` — сумма последних известных остатков по складам / среднее число единиц в неотменённых заказах за 30 календарных дней, заканчивающихся на дате самого старого из выбранных снимков. Для этой оценки неотменённый заказ используется как прокси спроса; заказ ещё может быть не доставлен, возвраты не учтены, спрос считается постоянным. Если спрос равен нулю или нет снимка, результат `NULL`. Разные даты последних снимков складов видны в полях `coverage_anchor_date_utc` и `latest_snapshot_date_utc`; сумма может смешивать даты. Оценка предполагает полную историю за окно и не проверяет её полноту; при неполных данных она ненадёжна. Порог риска не задан.
 
 Витрины имеют следующие уровни детализации: день заказа; товар за всю историю; день/товар/кампания; товар с последними снимками складов. Тесты dbt проверяют ключи, обязательные поля, связи, допустимые значения, бизнес-инварианты и сверку агрегатов с источником.
+
+## Операционный слой (этап 4)
+
+После заполнения `.env` запустите `docker compose up --build -d`. Сервисы: API `localhost:8000`, Dagster UI `localhost:3000`, Streamlit `localhost:8501`, PostgreSQL на порту из `.env`. Интерфейсы Dagster и Streamlit привязаны к localhost. В Dagster откройте job `marketplace_job` и запустите его: `marketplace_raw` загружает все ресурсы, затем `marketplace_dbt` выполняет `dbt build` и тесты. Первый запуск необходим до появления моделей на dashboard. История Dagster сохраняется в отдельном томе `dagster_data`.
+
+Фильтры периода и товаров действуют на заказы и рекламные расходы. Остатки — последние известные снимки выбранных товаров; даты периода к ним не применяются. Нет данных по возвратам и атрибуции, поэтому net revenue и ROAS не подменяются нулями. Freshness отображает возраст **успешной загрузки** относительно `FRESHNESS_MAX_HOURS`; source cursor показывается отдельно. Это локальная диагностика, а не production monitoring. Подробнее см. [архитектуру](docs/architecture.md).
+
+### Telegram
+
+По умолчанию `TELEGRAM_ENABLED=false`, поэтому запросы к Telegram не выполняются, даже если токен указан. Уведомления об ошибках Dagster job работают только при `TELEGRAM_ENABLED=true`, заполненных `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` и работающем Dagster daemon/sensor. Перед включением получите явное подтверждение получателя; не коммитьте `.env`. Если переменные не заданы, уведомление пропускается и job не падает из-за этого. Отправка best effort, без гарантии доставки и повторов. Изменив `.env`, пересоздайте Dagster: `docker compose up -d --force-recreate dagster`.
+
+### Демонстрация запуска, сбоя и восстановления
+
+Команды работают из корня проекта в macOS/Linux и PowerShell. Во всех вызовах ниже уведомления принудительно выключены. После `docker compose up --build -d`:
+
+```sh
+# Успешный ingestion + dbt build; смотрите результат в Dagster UI и dashboard.
+docker compose run --rm --no-deps -e TELEGRAM_ENABLED=false -e SELLER_API_SCENARIO=normal dagster dagster job execute -m operations.definitions -j marketplace_job
+# Симулятор каждый раз возвращает 500: в логах будут ограниченные retry и ошибка job.
+docker compose run --rm --no-deps -e TELEGRAM_ENABLED=false -e SELLER_API_SCENARIO=500 dagster dagster job execute -m operations.definitions -j marketplace_job
+# Повторный успешный запуск использует сохранённый checkpoint и upsert.
+docker compose run --rm --no-deps -e TELEGRAM_ENABLED=false -e SELLER_API_SCENARIO=normal dagster dagster job execute -m operations.definitions -j marketplace_job
+```
+
+Для `429` замените `500` на `429`; для timeout задайте `SELLER_API_SCENARIO=timeout` и дополнительно `-e SELLER_API_TIMEOUT_SECONDS=1`. Команды со сценарием ошибки возвращают ненулевой код. В Dagster UI доступны статусы и логи; повторы ingestion логируются как `api_retry`. Пример не отправляет реальные сообщения.
+
+### Резервное копирование и восстановление PostgreSQL
+
+Ниже создаётся custom-format dump в контейнере и копируется на хост; это одинаково работает в PowerShell и shell и избегает изменения бинарных данных перенаправлением PowerShell. Храните копию в защищённом месте; данные и пароль в Git не добавляются.
+
+```sh
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -f /tmp/marketplace-backup.dump'
+docker compose cp postgres:/tmp/marketplace-backup.dump ./marketplace-backup.dump
+docker compose exec -T postgres rm /tmp/marketplace-backup.dump
+```
+
+Для проверки восстановления в **новую** базу `marketplace_restore` (команда создания завершится ошибкой, если она уже существует):
+
+```sh
+docker compose cp ./marketplace-backup.dump postgres:/tmp/marketplace-restore.dump
+docker compose exec -T postgres sh -c 'createdb -U "$POSTGRES_USER" marketplace_restore'
+docker compose exec -T postgres sh -c 'pg_restore --exit-on-error --no-owner -U "$POSTGRES_USER" -d marketplace_restore /tmp/marketplace-restore.dump'
+docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d marketplace_restore -c "SELECT resource, completed_at FROM raw.ingestion_state ORDER BY resource;"'
+docker compose exec -T postgres rm /tmp/marketplace-restore.dump
+```
+
+Проверьте восстановленные таблицы и показатели перед переключением приложений на новую базу. Dump не включает роли PostgreSQL и историю Dagster; для неё нужен отдельный согласованный backup тома `dagster_data` при остановленном Dagster. `docker compose down -v` удаляет оба тома и все их данные.

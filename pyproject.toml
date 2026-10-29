@@ -5,16 +5,19 @@ description = "Foundation for a marketplace data platform"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "dagster>=1.10,<2",
+    "dagster-webserver>=1.10,<2",
+    "dbt-core>=1.9,<2",
+    "dbt-postgres>=1.9,<2",
     "fastapi>=0.115,<1.0",
     "httpx>=0.28,<1",
     "psycopg[binary]>=3.2,<4",
+    "streamlit>=1.40,<2",
     "uvicorn[standard]>=0.34,<1.0",
 ]
 
 [dependency-groups]
 dev = [
-    "dbt-core>=1.9,<2",
-    "dbt-postgres>=1.9,<2",
     "pytest>=8.3,<10.0",
     "ruff>=0.11,<1.0",
 ]
@@ -24,7 +27,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/api", "src/common", "src/ingestion"]
+packages = ["src/api", "src/common", "src/ingestion", "src/operations", "src/dashboard"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
