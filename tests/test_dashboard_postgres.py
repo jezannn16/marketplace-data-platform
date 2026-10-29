@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 
 import psycopg
+import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -58,6 +59,10 @@ def test_dashboard_filters_and_freshness_on_postgres(test_database_url):
                 == expected
             )
             assert all(row[3] == "fresh" for row in query_freshness(conn, timedelta(hours=24)))
+            with pytest.raises(psycopg.errors.UndefinedTable):
+                get_products(conn, 'analytics"; DROP SCHEMA raw CASCADE;--')
+            conn.rollback()
+            assert conn.execute("SELECT count(*) FROM raw.products").fetchone()[0] == 100
         finally:
             conn.rollback()
             conn.execute("DROP SCHEMA IF EXISTS analytics CASCADE")
