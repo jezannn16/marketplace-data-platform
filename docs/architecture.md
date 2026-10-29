@@ -1,13 +1,24 @@
 # Архитектура и компромиссы
 
-```text
-FastAPI (статичный синтетический Seller API)
-    → Python ingestion / retry / cursor
-        → PostgreSQL raw + ingestion_state
-            → dbt staging views → dbt mart tables → Streamlit
-Dagster: marketplace_raw → marketplace_dbt (dbt build + tests)
-Dagster sensor → Telegram только при явном включении и наличии настроек
+```mermaid
+flowchart LR
+    API["FastAPI: synthetic Seller API"] --> ING["Python ingestion"]
+    ING --> RAW[("PostgreSQL: raw and state")]
+    RAW --> STG["dbt staging views"]
+    STG --> MART["dbt mart tables and tests"]
+    MART --> UI["Streamlit"]
+    DAG["Dagster local job"] -. "1. ingestion" .-> ING
+    DAG -. "2. dbt build" .-> STG
+    DAG -. "optional on failure" .-> TG["Telegram"]
 ```
+
+## Поток и границы компонентов
+
+1. FastAPI генерирует фиксированный синтетический набор и отдаёт страницы с фильтром `updated_at`. Никакой внешний маркетплейс не подключён.
+2. Ingestion читает страницы, сохраняет JSONB и checkpoint в PostgreSQL. Он не управляет dbt и не хранит полную историю изменений.
+3. dbt читает raw, создаёт staging views и mart tables и выполняет тесты. Заказы, товары, остатки и реклама представлены отдельными моделями.
+4. Dagster запускает ingestion до dbt; Streamlit читает витрины и локальную историю Dagster. Необязательный sensor при ошибке может вызвать Telegram. Последний отключён по умолчанию.
+
 
 ## Решения
 

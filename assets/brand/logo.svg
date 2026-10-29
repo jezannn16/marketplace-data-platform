@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 128" role="img" aria-labelledby="title desc">
+  <title id="title">Marketplace Intelligence Platform</title>
+  <desc id="desc">A data pipeline connecting to an analytics chart</desc>
+  <rect width="680" height="128" rx="20" fill="#0B1020"/>
+  <rect width="128" height="128" rx="28" fill="#151D31"/>
+  <path d="M27 36h24v24H27zM27 68h24v24H27z" fill="none" stroke="#B7F36B" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M51 48h12v32H51m12-16h13" fill="none" stroke="#C4CBDA" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M79 81V67m11 14V53m11 28V40" fill="none" stroke="#B7F36B" stroke-width="6" stroke-linecap="round"/>
+  <text x="155" y="56" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="32" font-weight="700">MARKETPLACE</text>
+  <text x="155" y="94" fill="#C4CBDA" font-family="Arial, sans-serif" font-size="25" letter-spacing="1">INTELLIGENCE PLATFORM</text>
+</svg>
